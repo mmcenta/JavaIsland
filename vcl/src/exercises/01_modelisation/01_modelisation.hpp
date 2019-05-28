@@ -3,7 +3,6 @@
 #include "../../exercises/base_exercise/base_exercise.hpp"
 
 #ifdef INF443_01_MODELISATION
-
 // Stores some parameters that can be set from the GUI
 struct gui_scene_structure
 {
@@ -32,7 +31,21 @@ struct scene_exercise : base_scene_exercise
     // visual representation of a surface
     vcl::mesh_drawable terrain;
 
+    vcl::mesh_drawable tree_trunc;
+    vcl::mesh_drawable tree_foliage;
+    std::vector<vcl::vec3> tree_position;
+    void update_tree_position();
+    void display_tree(std::map<std::string,GLuint>& shaders, scene_structure& scene);
+
+
+    vcl::mesh_drawable mushroom_trunc;
+    vcl::mesh_drawable mushroom_top;
+    std::vector<vcl::vec3> mushroom_position;
+    void update_mushroom_position();
+    void display_mushroom(std::map<std::string,GLuint>& shaders, scene_structure& scene);
+
     gui_scene_structure gui_scene;
+    GLuint texture_id;
 };
 
 #endif

@@ -13,7 +13,7 @@ using namespace vcl;
 
 /** This function is called before the beginning of the animation loop
     It is used to initialize all part-specific data */
-void scene_exercise::setup_data(std::map<std::string,GLuint>& , scene_structure& , gui_structure& )
+void scene_exercise::setup_data(std::map<std::string,GLuint>& map, scene_structure& scene, gui_structure& )
 {
     // Create mesh structure (stored on CPU)
     // *************************************** //
@@ -33,7 +33,16 @@ void scene_exercise::setup_data(std::map<std::string,GLuint>& , scene_structure&
     surface = mesh_drawable(quadrangle_gpu); // conversion performed using the constructor of mesh_drawable
 
     // Example of uniform parameter setting: color of the shape (used in the shader)
-    surface.uniform_parameter.color = {1.0f, 1.0f, 0.6f};
+    surface.uniform_parameter.color = {1.0f, 0.3f, 0.6f};
+
+    // Create a mesh approximating a sphere (unit radius by default)
+    mesh sphere_cpu = mesh_primitive_sphere(); // mesh_primitive_sphere is a helper function (several primitive are available)
+    // Send sphere_cpu data onto GPU
+    sphere = mesh_drawable(sphere_cpu);
+    // Set uniform parameter of the sphere
+    sphere.uniform_parameter.color = {1,0,0};                  //red sphere
+    sphere.uniform_parameter.translation = {-0.1f,0.5f,0.25f}; // translate sphere display
+    sphere.uniform_parameter.scaling = 0.1f;                   // scale the sphere to new radius for its display
 
 }
 
@@ -45,7 +54,8 @@ void scene_exercise::setup_data(std::map<std::string,GLuint>& , scene_structure&
 void scene_exercise::frame_draw(std::map<std::string,GLuint>& shaders, scene_structure& scene, gui_structure& )
 {
     // Drawing call: provide the shader and camera information
-    surface.draw(shaders["mesh"], scene.camera);
+    surface.draw(shaders["wireframe"], scene.camera);
+    sphere.draw(shaders["mesh"], scene.camera);
 }
 
 

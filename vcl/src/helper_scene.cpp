@@ -11,7 +11,7 @@ GLFWwindow* create_window(const std::string& window_title)
     const int opengl_version_major = 3;
     const int opengl_version_minor = 3;
     const int window_width  = 1280;
-    const int window_height = 720;
+    const int window_height = 1000;
 
     GLFWwindow* window = vcl::glfw_create_window(window_width, window_height, window_title, opengl_version_major, opengl_version_minor);
     return window;
@@ -52,6 +52,7 @@ void load_shaders(std::map<std::string,GLuint>& shaders)
     shaders["wireframe"] = create_shader_program("shaders/wireframe/shader.vert.glsl","shaders/wireframe/shader.geom.glsl","shaders/wireframe/shader.frag.glsl");
     shaders["curve"] = create_shader_program("shaders/curve/shader.vert.glsl","shaders/curve/shader.frag.glsl");
     shaders["segment_im"] = create_shader_program("shaders/segment_immediate_mode/shader.vert.glsl","shaders/segment_immediate_mode/shader.frag.glsl");
+    shaders["ciel"] = create_shader_program("shaders/gradient/shader.vert.glsl","shaders/gradient/shader.frag.glsl");
 
     std::cout<<"\t [OK] Shader loaded"<<std::endl;
 }

@@ -1,0 +1,3 @@
+/home/pedro/Downloads/INF443/vcl/cmake/CMakeFiles/rebuild_cache.dir
+/home/pedro/Downloads/INF443/vcl/cmake/CMakeFiles/pgm.dir
+/home/pedro/Downloads/INF443/vcl/cmake/CMakeFiles/edit_cache.dir

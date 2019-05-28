@@ -72,7 +72,6 @@ int main()
     // ************************************** //
 
 
-
     std::cout<<"*** Start GLFW loop ***"<<std::endl;
     vcl::glfw_fps_counter fps_counter;
     while( !glfwWindowShouldClose(gui.window) )

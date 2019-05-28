@@ -1,0 +1,3 @@
+/home/pedro/Downloads/JavaIsland/cmake/CMakeFiles/rebuild_cache.dir
+/home/pedro/Downloads/JavaIsland/cmake/CMakeFiles/pgm.dir
+/home/pedro/Downloads/JavaIsland/cmake/CMakeFiles/edit_cache.dir

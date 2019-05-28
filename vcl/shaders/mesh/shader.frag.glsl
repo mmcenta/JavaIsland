@@ -18,7 +18,7 @@ uniform float ambiant  = 0.2;
 uniform float diffuse  = 0.8;
 uniform float specular = 0.5;
 
-vec3 light = vec3(camera_position.x, camera_position.y, 3.0f);
+vec3 light = vec3(0,0,50);
 
 void main()
 {
@@ -32,8 +32,8 @@ void main()
     float specular_value = specular * pow( clamp( dot(r,t), 0.0, 1.0), 128.0);
 
 
-    vec3 white = vec3(1.0);
-    vec4 color_texture = texture(texture_sampler, fragment.texture_uv);
+    vec3 white = vec3(1000);
+    vec4 color_texture = texture(texture_sampler, 2*fragment.texture_uv);
     vec3 c = (ambiant+diffuse_value)*color.rgb*fragment.color.rgb*color_texture.rgb + specular_value*white;
 
     FragColor = vec4(c, color_texture.a*fragment.color.a);

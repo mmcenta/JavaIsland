@@ -25,6 +25,7 @@ struct scene_exercise : base_scene_exercise
 
     // visual representation of a surface
     vcl::mesh_drawable surface;
+    vcl::mesh_drawable sphere;
 };
 
 #endif
