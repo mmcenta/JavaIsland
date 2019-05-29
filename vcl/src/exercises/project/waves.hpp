@@ -4,6 +4,13 @@
 #include "pixel_ray.hpp"
 #include "../../exercises/base_exercise/base_exercise.hpp"
 
+
+struct wave {
+    float frequency;
+    float amplitude;
+    vcl::vec2 direction;
+};
+
 // Stores some parameters that can be set from the GUI
 struct gui_scene_structure
 {
@@ -29,6 +36,7 @@ struct scene_exercise : base_scene_exercise
      * - data: The part-specific data structure defined previously
      * - gui: The GUI structure allowing to create/display buttons to interact with the scene.
     */
+    gui_scene_structure gui_scene;
 
     void setup_data(std::map<std::string,GLuint>& shaders, scene_structure& scene, gui_structure& gui);
     void frame_draw(std::map<std::string,GLuint>& shaders, scene_structure& scene, gui_structure& gui);
@@ -37,11 +45,11 @@ struct scene_exercise : base_scene_exercise
 
     // visual representation of a surface
     vcl::mesh_drawable sky;
-    vcl::mesh_drawable sea;
-    std::vector<vcl::vec2> waves_spectrum;
-    std::vector<vcl::vec2> waves_directions;
-    void update_height();
-    void init_spectrum();
+
+    // Waves
+    int num_waves;
+    std::vector<wave> waves;
+    void init_waves();
 
     vcl::mesh create_billboard_surface(float size);
     vcl::mesh_drawable billboard_surface;
@@ -56,17 +64,23 @@ struct scene_exercise : base_scene_exercise
     vcl::vec3 sun_position;
     void display_sun(std::map<std::string,GLuint>& shaders, scene_structure& scene);
 
-    // Ocean-related data structures
+    // Ocean-related data and methods
     plane ocean_plane;
+    vcl::mesh_drawable ocean;
 
-    ray_grid *rgrid;
+    void update_mesh_ocean();
+
+    // Particle related data and methods
     particle_grid *pgrid;
 
-    vcl::mesh_drawable ocean;
+    void update_particles();
+
+    // Local grid of projected rays
+    ray_grid *rgrid;
+
     vcl::mesh_drawable sphere;
     vcl::segment_drawable_immediate_mode segment_drawer;
 
-    gui_scene_structure gui_scene;
 };
 
 

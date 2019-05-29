@@ -3,31 +3,25 @@
 
 #include <random>
 
-#ifdef WAVES
-
 // Add vcl namespace within the current one - Allows to use function from vcl library without explicitely preceeding their name with vcl::
 using namespace vcl;
 
 // Generator for uniform random number on the interaval [-1.0, +1.0]
-std::default_random_engine generator;
-std::uniform_real_distribution<float> distrib(-1.0,1.0);
+std::default_random_engine gen;
+std::uniform_real_distribution<float> unif(-1.0,1.0);
 
 mesh create_cylinder(float radius, float height, float offset);
-float evaluate_sea_z(float u, float v);
-vec3 evaluate_sea(float u, float v);
-mesh create_sea();
-void update_height();
+
+// Constants
+const float PI = 3.14159265358979323846f;
+const float g = 9.81f; // gravity's acceleration
 
 // Global varibles for simulation
 float t = 0.0f;
 float dt = 0.02f;
-float f_pas = 0.04f;
+float f_step = 0.04f;
 float f = 0.6f;
 float threshold = 0.2; //spectrum filtering 
-
-// 
-std::vector<vec3> last_positions;
-std::vector<vec3> last_normals;
 
 //
 vcl::mesh create_skybox();
@@ -40,11 +34,6 @@ void scene_exercise::setup_data(std::map<std::string,GLuint>& , scene_structure&
     //scene.camera.camera_type = camera_control_spherical_coordinates;
     //scene.camera.scale = 50.0f;
     //scene.camera.apply_rotation(0,0,0,1.2f);
-    sea = create_sea();
-    sea.uniform_parameter.shading.specular = 0.8;
-    sea.uniform_parameter.color= vec3{0,0,0.1}; 
-
-
 
     sky = create_cylinder(140,100,40);
     texture_sun_billboard= texture_gpu(image_load_png("data/sun.png"));
@@ -62,14 +51,13 @@ void scene_exercise::setup_data(std::map<std::string,GLuint>& , scene_structure&
     sun_position= vec3(120*sin(1.50), 120*cos(1.50),3);
 
     init_spectrum();
-    //partie cena
 
     // Define the base plane of the ocean
     ocean_plane.point = { 0.0, 0.0, 0.0 };
     ocean_plane.normal = { 0.0, 0.0, 1.0 };
 
     // Create a grid of rays that are projected from the camera 
-    rgrid = new ray_grid(160, 90);
+    rgrid = new ray_grid(90, 160);
 
     // Create the particles that will be used to model the ocean
     pgrid = new particle_grid(90, 160);
@@ -80,13 +68,13 @@ void scene_exercise::setup_data(std::map<std::string,GLuint>& , scene_structure&
 
     // Create the sphere to display the projected rays
     const float r = 0.01f;
-    
     sphere = mesh_primitive_sphere(r);
     sphere.uniform_parameter.color = {0.6f, 0.6f, 1.0f};
 
     // Create the grid representing the ocean
-    ocean = mesh_primitive_grid(20, 20, 5.0f, 5.0f, { -2.5f, -2.5f, 0.0f }); 
+    ocean = mesh_primitive_grid(90, 160, 5.0f, 5.0f, { -2.5f, -2.5f, 0.0f }); 
     ocean.uniform_parameter.color = {0.1f, 0.1f, 1.0f};
+    ocean.uniform_parameter.shading.specular = 0.8;
 }
 
 void scene_exercise::init_textures(){
@@ -95,46 +83,72 @@ void scene_exercise::init_textures(){
     }
 }
 
-void scene_exercise::init_spectrum() {
+void scene_exercise::init_waves() {
     float dif = 1.0f;
 
+    int num_waves = 0;
     while (dif > 0.00001) {   
-        float fp = 0.13*9.81/15;
-        dif = 0.0081*9.81*9.81*exp(1.2*pow(fp/f,4))/(pow(2*3.1415,4)*pow(f,5));
+        float fp = 0.13*g/15;
+        dif = 0.0081*g*g*exp(1.2*pow(fp/f, 4))/(pow(2*PI, 4)*pow(f, 5));
 
-        waves_spectrum.push_back(vec2(dif,2*3.1415*f));
+        wave w;
+        w.amplitude = dif;
+        w.frequency = 2*PI*f; 
 
-        float var = distrib(generator);
-        float var2 = distrib(generator);
+        w.direction[0] = unif(gen);
+        w.direction[1] = unif(gen);
 
-        waves_directions.push_back(vec2(var, var2)/norm(vec2(var, var2)));
-        f += f_pas;
+        waves.emplace_back(w);
+        f += f_step;
+
+        ++num_waves;
     }
 }
 
-void scene_exercise::update_height() {
-    for (unsigned int i=0;i < last_positions.size(); i++) {
-        //vec3 pos= sea.data_gpu.vbo_position[i];
-        vec2 X0 = {last_positions[i][0],last_positions[i][1]};
-        vec2 X = X0;
-        float z = last_positions[i][2];
-        float z2=0;
-        vec2 X2(0,0);
+void scene_exercise::update_particles() {
+    for (int i = 0; i < rgrid.rows; ++i) {
+        for (int j = 0; j < rgrid.columns; ++j) {
+            const vec3 intersect = intersect_ray_plane(pgrid.rays[i][j], ocean_plane);
+            const vec2 X0 = { intersect[0], intersect[1] };
+            const float z0 = ocean_plane.origin[2];
 
-        for (unsigned int j = 0; j < waves_spectrum.size(); j++){
-            z += waves_spectrum[j][0]*cos(waves_spectrum[j][1]*t - dot( waves_directions[j], X));
-            z2 += -waves_spectrum[j][0]*waves_spectrum[j][1]*sin(waves_spectrum[j][1]*t - dot( waves_directions[j], X0));
-            X += waves_directions[j]*waves_spectrum[j][0]*sin(waves_spectrum[j][1]*t - dot( waves_directions[j], X0))/norm(waves_directions[j]);
-            X2 += waves_directions[j]*waves_spectrum[j][0]*cos(waves_spectrum[j][1]*t - dot( waves_directions[j], X0))/norm(waves_directions[j]);
+            // Compute displacements and normals on the Gerstner model
+            vec2 X = X0;
+            float z = z0;
+            vec3 normal = { 0.0f, 0.0f, 0.0f };
+            for (int k = 0; k < num_waves; ++k) {
+                // Displacement on the plane of the ocean
+                const vec2 var_plane = waves[k].amplitude * (waves[k].direction / norm(waves[k].direction))
+                                       * std::sin(waves[k].frequence*t - dot(waves[k].direction, X0));
+                // Displacement in height
+                const float var_height = waves[k].amplitude * std::cos(waves[k]*t - dot(waves[k], X0));
+
+                // Update variables
+                X += var_plane;
+                z += var_height;
+                normal += (waves[k].frequence*waves[k].frequence) * vec3(-var_plane[0], -var_plane[1], var_height);
+            }
+
+            pgrid.particles[i][j].position = { X[0], X[1], z };
+            pgrid.particles[i][j].normal = normal/norm(normal);
         }
-        last_positions[i]= vec3(X[0], X[1],z);
-
-        const vec3 n(X2[0], X2[1],z2);
-        last_normals[i] = n/(norm(n));
-        sea.data_gpu.update_position(last_positions);
-        sea.data_gpu.update_normal(last_normals);
     }
     t += dt;
+}
+
+void scene_exercise::update_mesh_ocean() {
+    std::vector<vec3> positions;
+    std::vector<vec3> normals;
+
+    for (int i = 0; i < pgrid.rows; ++i) {
+        for (int j = 0; j < pgrid.columns; ++j) {
+            positions.push_back(pgrid.particles[i][j].position);
+            normals.push_back(pgrid.particles[i][j].normal);
+        }
+    }
+
+    ocean.data_gpu.update_position(positions);
+    ocean.data_gpu.update_normal(normals);
 }
 
 /** This function is called at each frame of the animation loop.
@@ -144,11 +158,12 @@ void scene_exercise::frame_draw(std::map<std::string,GLuint>& shaders, scene_str
     glEnable( GL_POLYGON_OFFSET_FILL ); // avoids z-fighting when displaying wireframe
     
     update_rays(rays, grid, scene.camera);
-    update_grid(grid, rays, ocean_plane);
+    update_particles();
+    update_ocean_mesh();
+
+    ocean = mesh_ocean(pgrid, rgrid);
     ocean.draw(shaders["wireframe"], scene.camera);
 
-    //sea.draw(shaders["mesh"], scene.camera);  
-    //update_height();  
 
     //sky.draw(shaders["wireframe"], scene.camera);
     sky.draw(shaders["ciel"], scene.camera);
@@ -173,21 +188,6 @@ void scene_exercise::frame_draw(std::map<std::string,GLuint>& shaders, scene_str
     display_sun(shaders, scene);
 }
 
-float evaluate_sea_z(float u, float v) {
-    
-    return 0;
-}
-
-
-vec3 evaluate_sea(float u, float v)
-{
-    const float x = 20*(u-0.5f);
-    const float y = 20*(v-0.5f);
-    const float z = evaluate_sea_z(u,v);
-
-    return {x,y,z};
-}
-
 vcl::mesh scene_exercise::create_billboard_surface(float size)
 {
     mesh billboard;
@@ -200,7 +200,6 @@ vcl::mesh scene_exercise::create_billboard_surface(float size)
 
 void scene_exercise::update_cloud_position(float radius, float height, float ecart, float ecart2,int  N_clouds)
 {
-
     for(size_t k=0; k<N_clouds; ++k)
     {
         const float height2 = height+ ecart*distrib(generator);
@@ -312,63 +311,7 @@ mesh create_cylinder(float radius, float height, float offset) {
     return m;
 }
 
-
-mesh mesh_ocean() {
-    // Number of samples of the terrain is N x N
-    const size_t N = 100;
-
-    mesh terrain; // temporary terrain storage (CPU only)
-    terrain.position.resize(N*N);
-    terrain.texture_uv.resize(N*N);
-    terrain.color.resize(N*N);
-    terrain.normal.resize(N*N);
-    last_positions.resize(N*N);
-    last_normals.resize(N*N);
-
-    // Fill terrain geometry
-    for(size_t ku=0; ku<N; ++ku)
-    {
-        for(size_t kv=0; kv<N; ++kv)
-        {
-            // Compute local parametric coordinates (u,v) \in [0,1]
-            const float u = ku/(N-1.0f);
-            const float v = kv/(N-1.0f);
-
-            // Compute coordinates
-            terrain.position[kv+N*ku] = evaluate_sea(u,v);
-            last_positions[kv+N*ku]= evaluate_sea(u,v);
-            terrain.normal[kv+N*ku]= vec3(0,0,1);
-            last_normals[kv+N*ku]= vec3(0,0,1);
-            terrain.color[kv+N*ku] = vec4{0.7f,0.4f,2.6f, 1.0f};
-
-        }
-    }
-
-
-    // Generate triangle organization
-    //  Parametric surface with uniform grid sampling: generate 2 triangles for each grid cell
-	const unsigned int Ns = N;
-	assert(Ns >= 2);
-    for(unsigned int ku=0; ku<Ns-1; ++ku)
-    {
-        for(unsigned int kv=0; kv<Ns-1; ++kv)
-        {
-            const unsigned int idx = kv + Ns*ku; // current vertex offset
-
-            const index3 triangle_1 = {idx, idx+1+Ns, idx+1};
-            const index3 triangle_2 = {idx, idx+Ns, idx+1+Ns};
-
-            terrain.connectivity.push_back(triangle_1);
-            terrain.connectivity.push_back(triangle_2);
-        }
-    }
-
-    return terrain;
-}
-
-
-
-void update_pas(const gui_scene_structure &gui_scene){
+void update_step(const gui_scene_structure &gui_scene){
     dt = gui_scene.scaling;
 }
 
@@ -384,20 +327,9 @@ void scene_exercise::set_gui() {
     float scaling_min = 0.01f;
     float scaling_max = 0.8f;
     if( ImGui::SliderScalar("dt", ImGuiDataType_Float, &gui_scene.scaling, &scaling_min, &scaling_max) )
-        update_pas(gui_scene);
+        update_step(gui_scene);
     float threshold_min = 0.01f;
     float threshold_max = 0.8f;
     if( ImGui::SliderScalar("threshold", ImGuiDataType_Float, &gui_scene.threshold, &threshold_min, &threshold_max) )
         update_thre(gui_scene);
-
-
 }
-
-void update_grid(grid& g, std::vector<std::vector<oray>> rays, plane& p) {
-    for (int i = 0; i < g.height; ++i)
-        for (int j = 0; j < g.width; ++j)
-            g.points[i][j] = intersect_ray_plane(rays[i][j], p);
-}
-
-#endif
-
