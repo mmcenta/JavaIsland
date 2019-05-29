@@ -15,13 +15,17 @@ mesh create_cylinder(float radius, float height, float offset);
 
 // Constants
 const float PI = 3.14159265358979323846f;
-const float g = 9.81f; // gravity's acceleration
 
 // Global varibles for simulation
 float t = 0.0f;
 float dt = 0.02f;
-float f_step = 0.04f;
-float f = 0.6f;
+
+float df = 0.1f;
+float f0 = 1.9f;
+float f1 = 2.5f;
+
+float dphi = 0.1;
+float wind_speed = 50;
 float threshold = 0.2; //spectrum filtering 
 
 //
@@ -32,9 +36,9 @@ vcl::mesh create_skybox();
     It is used to initialize all part-specific data */
 void scene_exercise::setup_data(std::map<std::string,GLuint>& , scene_structure& scene, gui_structure& ) {
     // setup initial position of the camera
-    //scene.camera.camera_type = camera_control_spherical_coordinates;
-    //scene.camera.scale = 50.0f;
-    //scene.camera.apply_rotation(0,0,0,1.2f);
+    scene.camera.camera_type = camera_control_spherical_coordinates;
+    scene.camera.scale = 50.0f;
+    scene.camera.apply_rotation(0,0,0,1.2f);
 
     sky = create_cylinder(140,100,40);
     texture_sun_billboard= texture_gpu(image_load_png("data/sun.png"));
@@ -83,37 +87,45 @@ void scene_exercise::init_textures(){
 }
 
 void scene_exercise::init_waves() {
-    float dif = 1.0f;
+    // Physical constants (as per http://www.smart-coding.net/irwave/)
+    const float g = 9.81f;
+    const float A = 0.0081 * pow(g, 2);
+    const float B = 0.74 * pow(g/wind_speed, 4);  
+
+    
+    // Start generating waves
+    float f = f0;
 
     num_waves = 0;
-    while (dif > 0.00001) {   
-        float fp = 0.13*g/15;
-        dif = 0.0081*g*g*exp(1.2*pow(fp/f, 4))/(pow(2*PI, 4)*pow(f, 5));
+    while (f < f1) {   
+        for (int i =0; i < 4; i++){
+            wave w;
+            const float u = 2*PI*unif(gen);
 
-        wave w;
-        w.amplitude = dif;
-        w.frequency = 2*PI*f; 
+            const float S = A * pow(f,-5) * exp(-B/pow(f,4)) * (8/(3*PI)) * pow(cos(u), 4);
+            const float speed = pow(f, 2)/g;
+            const float amplitude = sqrt(2*S*df); 
 
-        w.direction[0] = unif(gen);
-        w.direction[1] = unif(gen);
+            w.amplitude = amplitude;
+            w.frequency = f;
+            w.direction = vec2(speed*std::cos(u), speed*std::sin(u));
 
-        waves.emplace_back(w);
-        f += f_step;
-
-        ++num_waves;
+            waves.emplace_back(w);
+            ++num_waves;
+        }
+       f += df;
     }
 }
 
-void scene_exercise::update_mesh_ocean() {
+void scene_exercise::update_mesh_ocean(float view_distance, const vec3& camera_position) {
     std::vector<vec3> positions;
     std::vector<vec3> normals;
-
-    std::vector<int> invalid;
 
     for (int i = 0; i < grid->height; ++i) {
         for (int j = 0; j < grid->width; ++j) {
             const picking_info intersect = ray_intersect_plane(grid->rays[i][j],
                                             ocean_plane.normal, ocean_plane.point);
+
             if (intersect.picking_valid) {
                 const vec2 X0 = { intersect.intersection[0], intersect.intersection[1] };
                 const float z0 = ocean_plane.point[2];
@@ -121,69 +133,37 @@ void scene_exercise::update_mesh_ocean() {
                 // Compute displacements and normals on the Gerstner model
                 vec2 X = X0;
                 float z = z0;
-                vec3 normal = { 0.0f, 0.0f, 0.0f };
+                vec3 normal = { 0.0f, 0.0f, 1.0f };
                 for (int k = 0; k < num_waves; ++k) {
                     // Displacement on the plane of the ocean
                     const vec2 var_plane = waves[k].amplitude * (waves[k].direction / norm(waves[k].direction))
-                                       * std::sin(waves[k].frequency*t - dot(waves[k].direction, X0));
-                    normal[0]-=  waves[k].amplitude * std::sin(waves[k].frequency*t - dot(waves[k].direction, X0))*waves[k].direction[0];
-                    normal[1]-=  waves[k].amplitude * std::sin(waves[k].frequency*t - dot(waves[k].direction, X0))*waves[k].direction[1];
+                                           * std::sin(waves[k].frequency*t - dot(waves[k].direction, X0));
                     // Displacement in height
                     const float var_height = waves[k].amplitude * std::cos(waves[k].frequency*t - dot(waves[k].direction, X0));
 
-                    // Update variables
+                    // Update particle position
                     X += var_plane;
                     z += var_height;
-                    //normal += (waves[k].frequency*waves[k].frequency) * vec3(-var_plane[0], -var_plane[1], var_height);
-                }
-                normal[2]=1;
 
+                    // Update normal
+                    normal[0] -=  waves[k].amplitude * std::sin(waves[k].frequency*t - dot(waves[k].direction, X0))*waves[k].direction[0];
+                    normal[1] -=  waves[k].amplitude * std::sin(waves[k].frequency*t - dot(waves[k].direction, X0))*waves[k].direction[1];
+                }
                 positions.emplace_back(X[0], X[1], z);
                 normals.push_back(normal/norm(normal));
             }
             else {
-                invalid.push_back(i*grid->width + j);
+                // Project the ray direction onto the ocean plane
+                const vec3 ray_u_plane = grid->rays[i][j].u - dot(grid->rays[i][j].u, ocean_plane.normal)*ocean_plane.normal;
 
-                positions.emplace_back(0.0f, 0.0f, 0.0f);
-                normals.emplace_back(0.0f, 0.0f, 0.0f);
+                // Place the point on this direction beyond the view distance
+                positions.emplace_back(camera_position[0] + 1.1*view_distance*ray_u_plane[0],
+                                       camera_position[0] + 1.1*view_distance*ray_u_plane[1],
+                                                                        ocean_plane.point[2]);
+
+                normals.push_back(ocean_plane.normal);
             }
         }
-    }
-
-    // Interpolate the values for the points with invalid intersection
-    for (int k = 0; k < invalid.size(); ++k) {
-        const int idx = invalid[k];
-        const int i = idx / grid->width;
-        const int j = idx % grid->width;
-
-        int neighbours = 0;
-        if (i > 0) {
-            positions[idx] += positions[idx - grid->width]; 
-            normals[idx] += normals[idx - grid->width];
-            
-            ++neighbours;
-        }
-        if (j < grid->width - 1) {
-            positions[idx] += positions[idx + 1];
-            normals[idx] += normals[idx + 1];
-
-            ++neighbours;
-        }
-        if (i < grid->height - 1) {
-            positions[idx] += positions[idx + grid->width];
-            normals[idx] += positions[idx + grid->width];
-
-            ++neighbours;
-        }
-        if (j > 0) {
-            positions[idx] += positions[idx - 1];
-            normals[idx] += normals[idx - 1];
-
-            ++neighbours;
-        }
-
-        positions[idx] /= neighbours;
-        normals[idx] /= neighbours;
     }
 
     t += dt;
@@ -200,7 +180,7 @@ void scene_exercise::frame_draw(std::map<std::string,GLuint>& shaders, scene_str
     
     update_rays(grid, scene.camera);
 
-    update_mesh_ocean();
+    update_mesh_ocean(scene.camera.perspective.z_far, scene.camera.camera_position());
 
     //sky.draw(shaders["wireframe"], scene.camera);
     sky.draw(shaders["ciel"], scene.camera);
@@ -348,10 +328,12 @@ void scene_exercise::set_gui() {
     ImGui::Checkbox("Clouds", &gui_scene.clouds);
     ImGui::Checkbox("Cloud Texture", &gui_scene.cloudstexture);
     ImGui::Checkbox("Wire Frame cloulds", &gui_scene.wireframeclouds);
+
     float scaling_min = 0.01f;
     float scaling_max = 0.8f;
     if( ImGui::SliderScalar("dt", ImGuiDataType_Float, &gui_scene.scaling, &scaling_min, &scaling_max) )
         update_step(gui_scene);
+
     float threshold_min = 0.01f;
     float threshold_max = 0.8f;
     if( ImGui::SliderScalar("threshold", ImGuiDataType_Float, &gui_scene.threshold, &threshold_min, &threshold_max) )

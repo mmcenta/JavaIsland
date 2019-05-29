@@ -7,7 +7,7 @@ using namespace vcl;
 void update_rays(ray_grid *g, const camera_scene& camera) {
     const mat4 R = camera.camera_matrix();
     const vec3 p0 = camera.camera_position();
-    const float d = 1/std::tan(camera.perspective.angle_of_view/2);
+    const float d = 1/std::tan(1.2f*camera.perspective.angle_of_view/2);
     const float aspect_ratio = camera.perspective.image_aspect;
 
     const float w_step = 2.0/g->width;

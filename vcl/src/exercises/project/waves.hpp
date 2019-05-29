@@ -11,15 +11,17 @@ struct wave {
 };
 
 // Stores some parameters that can be set from the GUI
-struct gui_scene_structure
-{
+struct gui_scene_structure {
     bool wireframe = true;
     bool clouds  = true;
     bool cloudstexture  = true;
     bool wireframeclouds  = false;
     bool skybox = false;
+
     float scaling = 0.02f;
     float threshold = 0.2f;
+    float f0 = 0.5f;
+    float f1 = 2.5f;
 };
 
 struct scene_exercise : base_scene_exercise
@@ -67,7 +69,7 @@ struct scene_exercise : base_scene_exercise
     plane ocean_plane;
     vcl::mesh_drawable ocean;
 
-    void update_mesh_ocean();
+    void update_mesh_ocean(float view_distance, const vcl::vec3& camera_position);
 
     // Local grid of projected rays
     ray_grid *grid;
