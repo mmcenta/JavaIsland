@@ -9,4 +9,4 @@
 #include "03_animation/example_animated_hierarchy.hpp"
 #include "03_animation/example_interpolation.hpp"
 #include "02_texture/02_texture.hpp"                                                                                                           
-#include "Project/waves.hpp"                                                                                                           
+#include "project/waves.hpp"                                                                                                           
