@@ -1,6 +1,5 @@
 #pragma once
 
-#include "particle.hpp"
 #include "pixel_ray.hpp"
 #include "../../exercises/base_exercise/base_exercise.hpp"
 
@@ -70,17 +69,12 @@ struct scene_exercise : base_scene_exercise
 
     void update_mesh_ocean();
 
-    // Particle related data and methods
-    particle_grid *pgrid;
-
-    void update_particles();
-
     // Local grid of projected rays
-    ray_grid *rgrid;
+    ray_grid *grid;
 
+    // for debug
     vcl::mesh_drawable sphere;
     vcl::segment_drawable_immediate_mode segment_drawer;
-
 };
 
 
