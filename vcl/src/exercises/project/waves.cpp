@@ -126,14 +126,17 @@ void scene_exercise::update_mesh_ocean() {
                     // Displacement on the plane of the ocean
                     const vec2 var_plane = waves[k].amplitude * (waves[k].direction / norm(waves[k].direction))
                                        * std::sin(waves[k].frequency*t - dot(waves[k].direction, X0));
+                    normal[0]-=  waves[k].amplitude * std::sin(waves[k].frequency*t - dot(waves[k].direction, X0))*waves[k].direction[0];
+                    normal[1]-=  waves[k].amplitude * std::sin(waves[k].frequency*t - dot(waves[k].direction, X0))*waves[k].direction[1];
                     // Displacement in height
                     const float var_height = waves[k].amplitude * std::cos(waves[k].frequency*t - dot(waves[k].direction, X0));
 
                     // Update variables
                     X += var_plane;
                     z += var_height;
-                    normal += (waves[k].frequency*waves[k].frequency) * vec3(-var_plane[0], -var_plane[1], var_height);
+                    //normal += (waves[k].frequency*waves[k].frequency) * vec3(-var_plane[0], -var_plane[1], var_height);
                 }
+                normal[2]=1;
 
                 positions.emplace_back(X[0], X[1], z);
                 normals.push_back(normal/norm(normal));
