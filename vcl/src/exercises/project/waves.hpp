@@ -1,9 +1,10 @@
 #pragma once
 
-#include "pixel_ray.hpp"
+#include "raytracing.hpp"
 #include "../../exercises/base_exercise/base_exercise.hpp"
 
 
+// Data structure representing a wave train
 struct wave {
     float frequency;
     float amplitude;
@@ -15,7 +16,6 @@ struct gui_scene_structure {
     bool wireframe = true;
     bool clouds  = true;
     bool cloudstexture  = true;
-    bool wireframeclouds  = false;
     bool skybox = false;
 
     float scaling = 0.02f;
@@ -41,10 +41,9 @@ struct scene_exercise : base_scene_exercise
 
     void setup_data(std::map<std::string,GLuint>& shaders, scene_structure& scene, gui_structure& gui);
     void frame_draw(std::map<std::string,GLuint>& shaders, scene_structure& scene, gui_structure& gui);
-
     void set_gui();
 
-    // visual representation of a surface
+    // Visual representation of a surface
     vcl::mesh_drawable sky;
 
     // Waves
@@ -52,17 +51,24 @@ struct scene_exercise : base_scene_exercise
     std::vector<wave> waves;
     void init_waves();
 
-    vcl::mesh create_billboard_surface(float size);
+    // Sky textures and methods
     vcl::mesh_drawable billboard_surface;
     vcl::mesh_drawable billboard_surface2;
+    
+    vcl::mesh create_billboard_surface(float size);
+
+    // Clouds
     GLuint texture_cloud_billboard[12];
     std::vector<vcl::vec3> clouds_position;
-    void init_textures();
+    
+    void init_cloud_textures();
     void update_cloud_position(float radius, float height, float ecart,  float ecart2, int N_clouds);
     void display_clouds(std::map<std::string,GLuint>& shaders, scene_structure& scene);
 
+    // Sun
     GLuint texture_sun_billboard;
     vcl::vec3 sun_position;
+    
     void display_sun(std::map<std::string,GLuint>& shaders, scene_structure& scene);
 
     // Ocean-related data and methods

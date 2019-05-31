@@ -1,6 +1,7 @@
 #version 330 core
 
-in struct fragment_data {
+in struct fragment_data
+{
     vec4 position;
     vec4 normal;
     vec4 color;
@@ -17,7 +18,7 @@ uniform float ambiant  = 0.2;
 uniform float diffuse  = 0.8;
 uniform float specular = 0.5;
 
-vec3 light = vec3(120, 0, 3);
+vec3 light = vec3(0,0,50);
 
 void main()
 {
@@ -28,7 +29,7 @@ void main()
 
 
     float diffuse_value  = diffuse * clamp( dot(u,n), 0.0, 1.0);
-    float specular_value = specular * pow( clamp( dot(r,t), 0.0, 1.0), 2000.0);
+    float specular_value = specular * pow( clamp( dot(r,t), 0.0, 1.0), 128.0);
 
 
     vec3 white = vec3(1000);

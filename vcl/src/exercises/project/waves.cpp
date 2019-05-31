@@ -1,5 +1,5 @@
 
-#include "pixel_ray.hpp"
+#include "raytracing.hpp"
 #include "waves.hpp"
 
 #include <random>
@@ -20,17 +20,12 @@ const float PI = 3.14159265358979323846f;
 float t = 0.0f;
 float dt = 0.02f;
 
-float df = 0.1f;
-float f0 = 1.9f;
-float f1 = 2.5f;
+float df = 0.2f;
+float f0 = 1.8f;
+float f1 = 2.8f;
 
 float dphi = 0.1;
 float wind_speed = 50;
-float threshold = 0.2; //spectrum filtering 
-
-//
-vcl::mesh create_skybox();
-
 
 /** This function is called before the beginning of the animation loop
     It is used to initialize all part-specific data */
@@ -40,20 +35,21 @@ void scene_exercise::setup_data(std::map<std::string,GLuint>& , scene_structure&
     scene.camera.scale = 50.0f;
     scene.camera.apply_rotation(0,0,0,1.2f);
 
+    // Set 
     sky = create_cylinder(140,100,40);
     texture_sun_billboard= texture_gpu(image_load_png("data/sun.png"));
-    init_textures();
+    init_cloud_textures();
 
     billboard_surface = create_billboard_surface(70.0);
     billboard_surface2 = create_billboard_surface(40.0);
-    billboard_surface.uniform_parameter.shading  = {1,0,0};
-    billboard_surface2.uniform_parameter.shading  = {1,0,0};
-    update_cloud_position(130,-10,7,0, 800);
-    update_cloud_position(130,7,7,0, 500);
-    update_cloud_position(130,13,10,0, 50);
-    update_cloud_position(130,16,8,0, 27);
-    update_cloud_position(130,80,20,0, 400);
-    sun_position= vec3(120*sin(1.50), 120*cos(1.50),3);
+    billboard_surface.uniform_parameter.shading = { 1, 0, 0 };
+    billboard_surface2.uniform_parameter.shading = { 1, 0, 0 };
+    update_cloud_position(130, -10, 7, 0, 800);
+    update_cloud_position(130, 7, 7, 0, 500);
+    update_cloud_position(130, 13, 10, 0, 50);
+    update_cloud_position(130, 16, 8, 0, 27);
+    update_cloud_position(130, 80, 20, 0, 400);
+    sun_position= vec3(120, 0, 3);
 
     // Define the base plane of the ocean
     ocean_plane.point = { 0.0, 0.0, 0.0 };
@@ -77,10 +73,12 @@ void scene_exercise::setup_data(std::map<std::string,GLuint>& , scene_structure&
     // Create the mesh representing the ocean
     ocean = mesh_primitive_grid(90, 160, 5.0f, 5.0f, { -2.5f, -2.5f, 0.0f }); 
     ocean.uniform_parameter.color = {0.1f, 0.1f, 1.0f};
-    ocean.uniform_parameter.shading.specular = 0.8;
+    ocean.uniform_parameter.shading.specular = 200.0f;
+    ocean.uniform_parameter.shading.ambiant = 0.1f;
+    ocean.uniform_parameter.shading.diffuse = 0.5f;
 }
 
-void scene_exercise::init_textures(){
+void scene_exercise::init_cloud_textures(){
     for(int i=0; i < 11; i++){
         texture_cloud_billboard[i]= texture_gpu(image_load_png("data/"+to_string(i+1)+".png"));
     }
@@ -91,7 +89,6 @@ void scene_exercise::init_waves() {
     const float g = 9.81f;
     const float A = 0.0081 * pow(g, 2);
     const float B = 0.74 * pow(g/wind_speed, 4);  
-
     
     // Start generating waves
     float f = f0;
@@ -117,6 +114,12 @@ void scene_exercise::init_waves() {
     }
 }
 
+/*  This function implements the Gerstner model for simulating waves with a dynamically 
+ *  adapted surface mesh.
+ *  
+ *  view_distance: is the maximum distance that will render objects.
+ *  camera_position: is where the camera currently is.
+ */
 void scene_exercise::update_mesh_ocean(float view_distance, const vec3& camera_position) {
     std::vector<vec3> positions;
     std::vector<vec3> normals;
@@ -168,6 +171,7 @@ void scene_exercise::update_mesh_ocean(float view_distance, const vec3& camera_p
 
     t += dt;
 
+    // Update the mesh on the GPU data
     ocean.data_gpu.update_position(positions);
     ocean.data_gpu.update_normal(normals);
 }
@@ -178,13 +182,12 @@ void scene_exercise::frame_draw(std::map<std::string,GLuint>& shaders, scene_str
     set_gui();
     glEnable( GL_POLYGON_OFFSET_FILL ); // avoids z-fighting when displaying wireframe
     
+    // Update wave simulation
     update_rays(grid, scene.camera);
-
     update_mesh_ocean(scene.camera.perspective.z_far, scene.camera.camera_position());
 
-    //sky.draw(shaders["wireframe"], scene.camera);
-    sky.draw(shaders["ciel"], scene.camera);
-
+    // Display skybox
+    sky.draw(shaders["sky"], scene.camera);
     display_clouds(shaders, scene);
     display_sun(shaders, scene);
     
@@ -192,27 +195,31 @@ void scene_exercise::frame_draw(std::map<std::string,GLuint>& shaders, scene_str
     if(gui_scene.wireframe)
         ocean.draw(shaders["wireframe"], scene.camera);
     else
-        ocean.draw(shaders["mesh"], scene.camera);
+        ocean.draw(shaders["water"], scene.camera);
 }
 
 vcl::mesh scene_exercise::create_billboard_surface(float size) {
     mesh billboard;
-    billboard.position = {{-0.1f*size,0,0}, {0.1f*size,0,0}, {0.1f*size,0.2f*size,0}, {-0.1f*size,0.2f*size,0}};
-    billboard.texture_uv = {{0,1}, {1,1}, {1,0}, {0,0}};
-    billboard.connectivity = {{0,1,2}, {0,2,3}};
+    billboard.position = { {-0.1f*size, 0, 0},
+                           { 0.1f*size, 0, 0},
+                           { 0.1f*size, 0.2f*size, 0},
+                           {-0.1f*size, 0.2f*size, 0}};
+     
+    billboard.texture_uv = { { 0, 1}, { 1, 1}, { 1, 0}, { 0, 0}};
+    billboard.connectivity = { { 0, 1, 2}, { 0, 2, 3}};
 
     return billboard;
 }
 
-void scene_exercise::update_cloud_position(float radius, float height, float ecart, float ecart2, int N_clouds)
-{
-    for (int k=0; k<N_clouds; ++k) {
-        const float height2 = height+ ecart*unif(gen);
-        float var = 2*PI*unif(gen);
-        float var2 = unif(gen);
-        const float x = (radius+ var2*ecart2)*sin(var);
-        const float y = (radius+ var2*ecart2)*cos(var);
-        clouds_position.push_back(vec3(x,y,height2));
+void scene_exercise::update_cloud_position(float radius, float height, float ecart, float ecart2, int N_clouds) {
+    for (int k = 0; k < N_clouds; ++k) {
+        const float h_var = height + ecart * unif(gen);
+        float ang_var = 2*PI * unif(gen);
+        float dist_var = unif(gen);
+        const float x = (radius + dist_var*ecart2)*sin(ang_var);
+        const float y = (radius + dist_var*ecart2)*cos(ang_var);
+        
+        clouds_position.push_back(vec3(x , y, height + h_var));
     }
 }
 
@@ -265,20 +272,6 @@ void scene_exercise::display_clouds(std::map<std::string,GLuint>& shaders, scene
             glDepthMask(true);
         }
     }
-    
-
-    if( gui_scene.wireframeclouds ){
-        for(size_t k=0; k<N_clouds; ++k)
-        {
-            const vec3& p = clouds_position[k];
-            billboard_surface.uniform_parameter.translation = p;
-
-            glPolygonOffset( 1.0, 1.0 );
-            billboard_surface.draw(shaders["wireframe"], scene.camera);
-        }
-    }
-
-
 }
 
 mesh create_cylinder(float radius, float height, float offset) {
@@ -315,27 +308,13 @@ mesh create_cylinder(float radius, float height, float offset) {
     return m;
 }
 
-void update_step(const gui_scene_structure &gui_scene){
-    dt = gui_scene.scaling;
-}
-
-void update_thre(const gui_scene_structure &gui_scene){
-    threshold = gui_scene.threshold;
-}
-
 void scene_exercise::set_gui() {
     ImGui::Checkbox("Wireframe", &gui_scene.wireframe);
     ImGui::Checkbox("Clouds", &gui_scene.clouds);
     ImGui::Checkbox("Cloud Texture", &gui_scene.cloudstexture);
-    ImGui::Checkbox("Wire Frame cloulds", &gui_scene.wireframeclouds);
 
     float scaling_min = 0.01f;
     float scaling_max = 0.8f;
     if( ImGui::SliderScalar("dt", ImGuiDataType_Float, &gui_scene.scaling, &scaling_min, &scaling_max) )
-        update_step(gui_scene);
-
-    float threshold_min = 0.01f;
-    float threshold_max = 0.8f;
-    if( ImGui::SliderScalar("threshold", ImGuiDataType_Float, &gui_scene.threshold, &threshold_min, &threshold_max) )
-        update_thre(gui_scene);
+        dt = gui_scene.scaling;
 }

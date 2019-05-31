@@ -1,5 +1,5 @@
 #include "../../vcl/vcl.hpp"
-#include "pixel_ray.hpp"
+#include "raytracing.hpp"
 
 using namespace vcl;
 
@@ -30,19 +30,4 @@ void update_rays(ray_grid *g, const camera_scene& camera) {
             g->rays[i][j].u = dir;
         }
     }
-}
-
-vec3 intersect_ray_plane(const pixel_ray& r, const plane& p) {
-    const float dot_prod = dot(r.direction, p.normal);
-
-    //std::cout << "ray direction: " << to_string(r.direction) << std::endl;
-    //std::cout << "plane normal:  " << to_string(p.normal) << std::endl;
-    //std::cout << "dot product: " << dot_prod << std::endl;
-
-    if (dot_prod != 0) {
-        const float d = dot(p.point - r.origin, p.normal)/dot_prod;   
-        return (r.origin+d*r.direction);
-    }
-
-    return { 0.0, 0.0, 0.0};
 }
